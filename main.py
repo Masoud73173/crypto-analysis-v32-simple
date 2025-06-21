@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-Crypto Analysis Bot V3.2 - Enterprise Edition
-============================================
-Complete integration of all 11 modules with advanced features
+Crypto Analysis Bot V3.2 - Enterprise Edition (Fixed)
+====================================================
+Safe integration of all 11 modules with graceful fallbacks and error handling
 Telegram Integration + Database + ML + Advanced TA + Professional Configuration
 """
 
@@ -10,106 +10,184 @@ import os
 import json
 import logging
 import time
+import functools
 from datetime import datetime, timedelta
 from flask import Flask, jsonify, request
 from flask_cors import CORS
+import requests
+from typing import Dict, List, Any, Optional
 
-# Import our professional modules
+# Configure logging first
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
+# Safe timing decorator
+def safe_timing_decorator(func):
+    """Safe timing decorator that always works"""
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        start_time = time.time()
+        result = func(*args, **kwargs)
+        end_time = time.time()
+        execution_time = end_time - start_time
+        logger.debug(f"⏱️  {func.__name__} executed in {execution_time:.4f} seconds")
+        return result
+    return wrapper
+
+# Safe imports with fallbacks
 try:
     from technical_analysis import TechnicalAnalysis, analyze_crypto_signals
     TA_AVAILABLE = True
-except ImportError:
+    logger.info("✅ Technical Analysis module loaded")
+except ImportError as e:
     TA_AVAILABLE = False
-    logging.warning("⚠️  Technical Analysis module not available")
+    logger.warning(f"⚠️  Technical Analysis module not available: {e}")
 
 try:
     from database import CryptoBotDatabase, save_crypto_price, save_trading_signal
     DATABASE_AVAILABLE = True
-except ImportError:
+    logger.info("✅ Database module loaded")
+except ImportError as e:
     DATABASE_AVAILABLE = False
-    logging.warning("⚠️  Database module not available")
+    logger.warning(f"⚠️  Database module not available: {e}")
 
 try:
     from config import get_config, CryptoBotConfig
     CONFIG_AVAILABLE = True
-except ImportError:
+    logger.info("✅ Config module loaded")
+except ImportError as e:
     CONFIG_AVAILABLE = False
-    logging.warning("⚠️  Config module not available")
+    logger.warning(f"⚠️  Config module not available: {e}")
 
 try:
     from utils import (format_price, format_percentage, format_volume, 
                       get_current_timestamp, get_current_time_tehran,
                       safe_float, calculate_percentage_change, timing_decorator)
     UTILS_AVAILABLE = True
-except ImportError:
+    logger.info("✅ Utils module loaded")
+    # Use the imported timing decorator if available
+    timing_decorator_func = timing_decorator
+except ImportError as e:
     UTILS_AVAILABLE = False
-    logging.warning("⚠️  Utils module not available")
+    logger.warning(f"⚠️  Utils module not available: {e}")
+    # Use our safe fallback
+    timing_decorator_func = safe_timing_decorator
+    
+    # Define fallback functions
+    def format_price(price, symbol="$"):
+        try:
+            if price >= 1000:
+                return f"{symbol}{price:,.2f}"
+            elif price >= 1:
+                return f"{symbol}{price:.2f}"
+            elif price >= 0.01:
+                return f"{symbol}{price:.4f}"
+            else:
+                return f"{symbol}{price:.8f}"
+        except:
+            return f"{symbol}0.00"
+    
+    def format_percentage(value, include_sign=True):
+        try:
+            if include_sign:
+                sign = "+" if value > 0 else ""
+                return f"{sign}{value:.2f}%"
+            else:
+                return f"{abs(value):.2f}%"
+        except:
+            return "0.00%"
+    
+    def format_volume(volume):
+        try:
+            if volume >= 1_000_000_000:
+                return f"{volume/1_000_000_000:.2f}B"
+            elif volume >= 1_000_000:
+                return f"{volume/1_000_000:.2f}M"
+            elif volume >= 1_000:
+                return f"{volume/1_000:.2f}K"
+            else:
+                return f"{volume:.0f}"
+        except:
+            return "0"
+    
+    def get_current_timestamp():
+        return datetime.now().isoformat()
+    
+    def get_current_time_tehran():
+        return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    
+    def safe_float(value, default=0.0):
+        try:
+            return float(value)
+        except:
+            return default
 
 try:
     from ml_models import CryptoPricePredictor, get_ml_signals
     ML_AVAILABLE = True
-except ImportError:
+    logger.info("✅ ML Models module loaded")
+except ImportError as e:
     ML_AVAILABLE = False
-    logging.warning("⚠️  ML Models module not available")
-
-# External libraries
-import requests
-from typing import Dict, List, Any, Optional
-
-# Configure advanced logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.StreamHandler(),
-        logging.FileHandler('crypto_bot.log') if os.path.exists('.') else logging.StreamHandler()
-    ]
-)
-logger = logging.getLogger(__name__)
+    logger.warning(f"⚠️  ML Models module not available: {e}")
 
 # Initialize Flask app
 app = Flask(__name__)
 CORS(app)
 
 # Bot configuration
-BOT_VERSION = "3.2.0-Enterprise-Full-Integration"
+BOT_VERSION = "3.2.0-Enterprise-Fixed"
 BOT_NAME = "Crypto Analysis Bot V3.2 Enterprise"
 
-# Initialize components
+# Initialize components safely
 database = None
 config = None
 ta_analyzer = None
 ml_predictor = None
 
-def initialize_components():
-    """Initialize all bot components"""
+def safe_initialize_components():
+    """Safely initialize all bot components with error handling"""
     global database, config, ta_analyzer, ml_predictor
     
     try:
         # Initialize configuration
         if CONFIG_AVAILABLE:
-            config = get_config()
-            logger.info("✅ Configuration system initialized")
+            try:
+                config = get_config()
+                logger.info("✅ Configuration system initialized")
+            except Exception as e:
+                logger.warning(f"⚠️  Config initialization failed: {e}")
         
         # Initialize database
         if DATABASE_AVAILABLE:
-            database = CryptoBotDatabase()
-            logger.info("✅ Database system initialized")
+            try:
+                database = CryptoBotDatabase()
+                logger.info("✅ Database system initialized")
+            except Exception as e:
+                logger.warning(f"⚠️  Database initialization failed: {e}")
         
         # Initialize technical analysis
         if TA_AVAILABLE:
-            ta_analyzer = TechnicalAnalysis()
-            logger.info("✅ Technical Analysis system initialized")
+            try:
+                ta_analyzer = TechnicalAnalysis()
+                logger.info("✅ Technical Analysis system initialized")
+            except Exception as e:
+                logger.warning(f"⚠️  TA initialization failed: {e}")
         
         # Initialize ML predictor
         if ML_AVAILABLE:
-            ml_predictor = CryptoPricePredictor()
-            logger.info("✅ Machine Learning system initialized")
+            try:
+                ml_predictor = CryptoPricePredictor()
+                logger.info("✅ Machine Learning system initialized")
+            except Exception as e:
+                logger.warning(f"⚠️  ML initialization failed: {e}")
         
-        logger.info("🚀 All enterprise components initialized successfully")
+        logger.info("🚀 Component initialization completed")
         
     except Exception as e:
-        logger.error(f"❌ Error initializing components: {e}")
+        logger.error(f"❌ Error in component initialization: {e}")
 
 # Telegram configuration
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "7754175422:AAFOHaxVwphnfm43I_Y7BoVdSHmXKcgdQQA")
@@ -142,7 +220,7 @@ def send_telegram_message(message: str) -> bool:
         logger.error(f"❌ Telegram error: {e}")
         return False
 
-@timing_decorator
+@timing_decorator_func
 def get_crypto_prices() -> List[Dict]:
     """Get crypto prices with professional error handling"""
     try:
@@ -158,23 +236,26 @@ def get_crypto_prices() -> List[Dict]:
             if item['symbol'] in CRYPTO_SYMBOLS:
                 formatted_data = {
                     'symbol': item['symbol'],
-                    'price': safe_float(item['lastPrice']) if UTILS_AVAILABLE else float(item['lastPrice']),
-                    'change_24h': safe_float(item['priceChangePercent']) if UTILS_AVAILABLE else float(item['priceChangePercent']),
-                    'volume': safe_float(item['volume']) if UTILS_AVAILABLE else float(item['volume']),
-                    'high_24h': safe_float(item['highPrice']) if UTILS_AVAILABLE else float(item['highPrice']),
-                    'low_24h': safe_float(item['lowPrice']) if UTILS_AVAILABLE else float(item['lowPrice']),
-                    'timestamp': get_current_timestamp() if UTILS_AVAILABLE else datetime.now().isoformat()
+                    'price': safe_float(item['lastPrice']),
+                    'change_24h': safe_float(item['priceChangePercent']),
+                    'volume': safe_float(item['volume']),
+                    'high_24h': safe_float(item['highPrice']),
+                    'low_24h': safe_float(item['lowPrice']),
+                    'timestamp': get_current_timestamp()
                 }
                 crypto_data.append(formatted_data)
                 
                 # Save to database if available
                 if DATABASE_AVAILABLE and database:
-                    save_crypto_price(
-                        item['symbol'], 
-                        formatted_data['price'], 
-                        formatted_data['volume'], 
-                        formatted_data['change_24h']
-                    )
+                    try:
+                        save_crypto_price(
+                            item['symbol'], 
+                            formatted_data['price'], 
+                            formatted_data['volume'], 
+                            formatted_data['change_24h']
+                        )
+                    except Exception as e:
+                        logger.warning(f"⚠️  Database save failed: {e}")
         
         logger.info(f"📊 Retrieved prices for {len(crypto_data)} cryptocurrencies")
         return crypto_data
@@ -184,7 +265,7 @@ def get_crypto_prices() -> List[Dict]:
         return []
 
 def perform_advanced_analysis(crypto_data: List[Dict]) -> Dict[str, Any]:
-    """Perform comprehensive analysis using all available modules"""
+    """Perform comprehensive analysis using available modules"""
     analysis_results = {
         'signals': [],
         'market_overview': {},
@@ -232,15 +313,18 @@ def perform_advanced_analysis(crypto_data: List[Dict]) -> Dict[str, Any]:
                                 
                                 # Save to database
                                 if DATABASE_AVAILABLE:
-                                    save_trading_signal(
-                                        crypto['symbol'],
-                                        ta_signals['signal'],
-                                        ta_signals['strength'],
-                                        ta_signals['confidence'],
-                                        crypto['price'],
-                                        ta_signals.get('indicators', {}),
-                                        ta_signals.get('analysis', '')
-                                    )
+                                    try:
+                                        save_trading_signal(
+                                            crypto['symbol'],
+                                            ta_signals['signal'],
+                                            ta_signals['strength'],
+                                            ta_signals['confidence'],
+                                            crypto['price'],
+                                            ta_signals.get('indicators', {}),
+                                            ta_signals.get('analysis', '')
+                                        )
+                                    except Exception as e:
+                                        logger.warning(f"⚠️  Signal save failed: {e}")
                 except Exception as e:
                     logger.warning(f"⚠️  TA analysis failed for {crypto['symbol']}: {e}")
         
@@ -287,7 +371,7 @@ def format_telegram_message(crypto_data: List[Dict], analysis: Dict = None) -> s
     if not crypto_data:
         return "❌ No crypto data available"
     
-    current_time = get_current_time_tehran() if UTILS_AVAILABLE else datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    current_time = get_current_time_tehran()
     
     message = f"""🤖 <b>Crypto Analysis Bot V3.2 Enterprise</b>
 💰 <b>Current Prices</b>
@@ -297,9 +381,9 @@ def format_telegram_message(crypto_data: List[Dict], analysis: Dict = None) -> s
     
     for crypto in crypto_data:
         change_emoji = "🟢" if crypto['change_24h'] >= 0 else "🔴"
-        price_formatted = format_price(crypto['price']) if UTILS_AVAILABLE else f"${crypto['price']:.2f}"
-        change_formatted = format_percentage(crypto['change_24h']) if UTILS_AVAILABLE else f"{crypto['change_24h']:+.2f}%"
-        volume_formatted = format_volume(crypto['volume']) if UTILS_AVAILABLE else f"{crypto['volume']:.0f}"
+        price_formatted = format_price(crypto['price'])
+        change_formatted = format_percentage(crypto['change_24h'])
+        volume_formatted = format_volume(crypto['volume'])
         
         message += f"""{change_emoji} <b>{crypto['symbol']}</b>
 💵 {price_formatted}
@@ -327,7 +411,7 @@ def format_daily_summary(crypto_data: List[Dict], analysis: Dict = None) -> str:
     if not crypto_data:
         return "❌ No market data available"
     
-    current_time = get_current_time_tehran() if UTILS_AVAILABLE else datetime.now().strftime("%Y-%m-%d %H:%M")
+    current_time = get_current_time_tehran()
     
     # Calculate market stats
     gainers = [c for c in crypto_data if c['change_24h'] > 0]
@@ -354,19 +438,19 @@ def format_daily_summary(crypto_data: List[Dict], analysis: Dict = None) -> str:
 📈 <b>Market Overview:</b>
 🟢 Gainers: {len(gainers)}/{len(crypto_data)}
 🔴 Losers: {len(losers)}/{len(crypto_data)}
-📊 Total Volume: {format_volume(total_volume) if UTILS_AVAILABLE else f"{total_volume:.0f}"}
+📊 Total Volume: {format_volume(total_volume)}
 
 🏆 <b>Top Performer:</b>
-💰 {top_performer['symbol'] if top_performer else 'N/A'} - {format_price(top_performer['price']) if top_performer and UTILS_AVAILABLE else 'N/A'}
-📈 24h: {format_percentage(top_performer['change_24h']) if top_performer and UTILS_AVAILABLE else 'N/A'}
+💰 {top_performer['symbol'] if top_performer else 'N/A'} - {format_price(top_performer['price']) if top_performer else 'N/A'}
+📈 24h: {format_percentage(top_performer['change_24h']) if top_performer else 'N/A'}
 
 📉 <b>Worst Performer:</b>
-💰 {worst_performer['symbol'] if worst_performer else 'N/A'} - {format_price(worst_performer['price']) if worst_performer and UTILS_AVAILABLE else 'N/A'}
-📈 24h: {format_percentage(worst_performer['change_24h']) if worst_performer and UTILS_AVAILABLE else 'N/A'}
+💰 {worst_performer['symbol'] if worst_performer else 'N/A'} - {format_price(worst_performer['price']) if worst_performer else 'N/A'}
+📈 24h: {format_percentage(worst_performer['change_24h']) if worst_performer else 'N/A'}
 
 🔥 <b>Highest Volume:</b>
 💰 {highest_volume['symbol'] if highest_volume else 'N/A'}
-📊 Volume: {format_volume(highest_volume['volume']) if highest_volume and UTILS_AVAILABLE else 'N/A'}
+📊 Volume: {format_volume(highest_volume['volume']) if highest_volume else 'N/A'}
 
 🎯 <b>Signals Today:</b>
 """
@@ -399,7 +483,7 @@ def format_daily_summary(crypto_data: List[Dict], analysis: Dict = None) -> str:
     return message
 
 # ===============================
-# FLASK ROUTES - ENTERPRISE EDITION
+# FLASK ROUTES - ENTERPRISE EDITION (FIXED)
 # ===============================
 
 @app.route('/', methods=['GET'])
@@ -418,7 +502,8 @@ def home():
             "configuration_management": CONFIG_AVAILABLE,
             "utilities": UTILS_AVAILABLE,
             "automation": True,
-            "daily_summaries": True
+            "daily_summaries": True,
+            "enterprise_edition": True
         },
         "endpoints": {
             "health": "/health",
@@ -430,10 +515,13 @@ def home():
             "telegram_prices": "/telegram/prices",
             "telegram_signals": "/telegram/signals",
             "telegram_daily_summary": "/telegram/daily-summary",
-            "database_info": "/database/info",
-            "ml_status": "/ml/status",
-            "config_summary": "/config/summary",
             "system_test": "/test"
+        },
+        "enterprise_endpoints": {
+            "database_info": "/database/info" if DATABASE_AVAILABLE else "unavailable",
+            "ml_status": "/ml/status" if ML_AVAILABLE else "unavailable",
+            "config_summary": "/config/summary" if CONFIG_AVAILABLE else "unavailable",
+            "technical_test": "/technical/test" if TA_AVAILABLE else "unavailable"
         },
         "automation": {
             "analysis_interval": "Every 2 hours",
@@ -449,7 +537,7 @@ def health_check():
     return jsonify({
         "status": "healthy",
         "version": BOT_VERSION,
-        "timestamp": get_current_timestamp() if UTILS_AVAILABLE else datetime.now().isoformat(),
+        "timestamp": get_current_timestamp(),
         "uptime_seconds": time.time() - start_time,
         "components": {
             "telegram_enabled": bool(TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID),
@@ -508,14 +596,14 @@ def get_status():
     if verbose and DATABASE_AVAILABLE and database:
         try:
             status["database"] = database.get_database_info()
-        except:
-            pass
+        except Exception as e:
+            logger.warning(f"⚠️  Database info failed: {e}")
     
     if verbose and CONFIG_AVAILABLE and config:
         try:
             status["configuration"] = config.get_summary()
-        except:
-            pass
+        except Exception as e:
+            logger.warning(f"⚠️  Config info failed: {e}")
     
     return jsonify(status)
 
@@ -526,7 +614,7 @@ def get_prices():
     
     return jsonify({
         "success": True,
-        "timestamp": get_current_timestamp() if UTILS_AVAILABLE else datetime.now().isoformat(),
+        "timestamp": get_current_timestamp(),
         "count": len(crypto_data),
         "data": crypto_data
     })
@@ -543,7 +631,7 @@ def analyze_crypto():
         return jsonify({
             "success": False,
             "error": "Failed to retrieve crypto data",
-            "timestamp": get_current_timestamp() if UTILS_AVAILABLE else datetime.now().isoformat()
+            "timestamp": get_current_timestamp()
         })
     
     analysis_results = {}
@@ -552,7 +640,7 @@ def analyze_crypto():
     if advanced and (TA_AVAILABLE or ML_AVAILABLE):
         analysis_results = perform_advanced_analysis(crypto_data)
         signals = analysis_results.get('signals', [])
-        analysis_type = "Advanced Analysis (TA + ML + Database)"
+        analysis_type = f"Advanced Analysis (TA: {'✅' if TA_AVAILABLE else '❌'}, ML: {'✅' if ML_AVAILABLE else '❌'}, DB: {'✅' if DATABASE_AVAILABLE else '❌'})"
     else:
         # Basic analysis
         for crypto in crypto_data:
@@ -576,7 +664,7 @@ def analyze_crypto():
     return jsonify({
         "success": True,
         "analysis_type": analysis_type,
-        "timestamp": get_current_timestamp() if UTILS_AVAILABLE else datetime.now().isoformat(),
+        "timestamp": get_current_timestamp(),
         "symbols_analyzed": len(crypto_data),
         "signal_count": len(signals),
         "signals": signals,
@@ -591,14 +679,21 @@ def analyze_crypto():
 @app.route('/telegram/test', methods=['GET', 'POST'])
 def telegram_test():
     """Test Telegram integration"""
-    message = f"""🤖 <b>Crypto Analysis Bot V3.2 Enterprise</b>
+    message = f"""🤖 <b>Crypto Analysis Bot V3.2 Enterprise (Fixed)</b>
 ✅ <b>Test Message</b>
-⏰ {get_current_time_tehran() if UTILS_AVAILABLE else datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+⏰ {get_current_time_tehran()}
 
 🎉 Bot is Online & Working!
 📱 Telegram integration successful
 🌐 Enterprise edition active
 🚀 All systems operational
+
+Enterprise Features:
+📊 Technical Analysis: {'✅' if TA_AVAILABLE else '❌'}
+🧠 Machine Learning: {'✅' if ML_AVAILABLE else '❌'}
+🗄️ Database Storage: {'✅' if DATABASE_AVAILABLE else '❌'}
+⚙️ Configuration: {'✅' if CONFIG_AVAILABLE else '❌'}
+🔧 Utilities: {'✅' if UTILS_AVAILABLE else '❌'}
 
 Ready to send crypto signals! 🚀"""
     
@@ -608,7 +703,7 @@ Ready to send crypto signals! 🚀"""
         "success": success,
         "message": "Test message sent to Telegram" if success else "Failed to send test message",
         "telegram_configured": bool(TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID),
-        "timestamp": get_current_timestamp() if UTILS_AVAILABLE else datetime.now().isoformat()
+        "timestamp": get_current_timestamp()
     })
 
 @app.route('/telegram/prices', methods=['GET', 'POST'])
@@ -620,7 +715,7 @@ def telegram_prices():
         return jsonify({
             "success": False,
             "message": "Failed to get price data",
-            "timestamp": get_current_timestamp() if UTILS_AVAILABLE else datetime.now().isoformat()
+            "timestamp": get_current_timestamp()
         })
     
     message = format_telegram_message(crypto_data)
@@ -630,7 +725,7 @@ def telegram_prices():
         "success": success,
         "message": "Price update sent to Telegram" if success else "Failed to send price update",
         "prices_count": len(crypto_data),
-        "timestamp": get_current_timestamp() if UTILS_AVAILABLE else datetime.now().isoformat()
+        "timestamp": get_current_timestamp()
     })
 
 @app.route('/telegram/signals', methods=['GET', 'POST'])
@@ -642,7 +737,7 @@ def telegram_signals():
         return jsonify({
             "success": False,
             "message": "Failed to get crypto data",
-            "timestamp": get_current_timestamp() if UTILS_AVAILABLE else datetime.now().isoformat()
+            "timestamp": get_current_timestamp()
         })
     
     # Perform advanced analysis
@@ -651,9 +746,9 @@ def telegram_signals():
     
     if signals:
         # Format signals message
-        message = f"""🤖 <b>Crypto Analysis Bot V3.2 Enterprise</b>
+        message = f"""🤖 <b>Crypto Analysis Bot V3.2 Enterprise (Fixed)</b>
 📊 <b>Analysis Complete</b>
-⏰ {get_current_time_tehran() if UTILS_AVAILABLE else datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+⏰ {get_current_time_tehran()}
 
 🎯 <b>Signals Detected: {len(signals)}</b>
 
@@ -674,9 +769,9 @@ def telegram_signals():
         
     else:
         # No strong signals
-        message = f"""🤖 <b>Crypto Analysis Bot V3.2 Enterprise</b>
+        message = f"""🤖 <b>Crypto Analysis Bot V3.2 Enterprise (Fixed)</b>
 📊 <b>Analysis Complete</b>
-⏰ {get_current_time_tehran() if UTILS_AVAILABLE else datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+⏰ {get_current_time_tehran()}
 
 📈 <b>Market Status: No Strong Signals</b>
 🔍 <b>Symbols Analyzed:</b> {len(crypto_data)} cryptos
@@ -690,7 +785,7 @@ Bot is monitoring markets 24/7 🚀"""
         "message": "Signals sent to Telegram" if success else "Failed to send signals",
         "signal_count": len(signals),
         "symbols_analyzed": len(crypto_data),
-        "timestamp": get_current_timestamp() if UTILS_AVAILABLE else datetime.now().isoformat()
+        "timestamp": get_current_timestamp()
     })
 
 @app.route('/telegram/daily-summary', methods=['GET', 'POST'])
@@ -702,7 +797,7 @@ def telegram_daily_summary():
         return jsonify({
             "success": False,
             "message": "Failed to get market data",
-            "timestamp": get_current_timestamp() if UTILS_AVAILABLE else datetime.now().isoformat()
+            "timestamp": get_current_timestamp()
         })
     
     # Perform comprehensive analysis
@@ -739,21 +834,28 @@ def telegram_daily_summary():
             "losers": len([c for c in crypto_data if c['change_24h'] < 0]),
             "total_volume": sum(c['volume'] for c in crypto_data)
         },
-        "timestamp": get_current_timestamp() if UTILS_AVAILABLE else datetime.now().isoformat()
+        "timestamp": get_current_timestamp()
     })
 
 # ===============================
-# ADVANCED ENTERPRISE ENDPOINTS
+# ADVANCED ENTERPRISE ENDPOINTS (SAFE)
 # ===============================
 
 @app.route('/database/info', methods=['GET'])
 def database_info():
     """Get database information and statistics"""
-    if not DATABASE_AVAILABLE or not database:
+    if not DATABASE_AVAILABLE:
         return jsonify({
             "success": False,
-            "error": "Database not available",
-            "database_available": DATABASE_AVAILABLE
+            "error": "Database module not available",
+            "database_available": False
+        })
+    
+    if not database:
+        return jsonify({
+            "success": False,
+            "error": "Database not initialized",
+            "database_available": True
         })
     
     try:
@@ -764,13 +866,13 @@ def database_info():
             "success": True,
             "database_info": info,
             "performance_stats": performance_stats,
-            "timestamp": get_current_timestamp() if UTILS_AVAILABLE else datetime.now().isoformat()
+            "timestamp": get_current_timestamp()
         })
     except Exception as e:
         return jsonify({
             "success": False,
             "error": str(e),
-            "timestamp": get_current_timestamp() if UTILS_AVAILABLE else datetime.now().isoformat()
+            "timestamp": get_current_timestamp()
         })
 
 @app.route('/ml/status', methods=['GET'])
@@ -790,7 +892,7 @@ def ml_status():
                 "success": True,
                 "ml_available": True,
                 "model_info": model_info,
-                "timestamp": get_current_timestamp() if UTILS_AVAILABLE else datetime.now().isoformat()
+                "timestamp": get_current_timestamp()
             })
         else:
             return jsonify({
@@ -802,31 +904,37 @@ def ml_status():
         return jsonify({
             "success": False,
             "error": str(e),
-            "timestamp": get_current_timestamp() if UTILS_AVAILABLE else datetime.now().isoformat()
+            "timestamp": get_current_timestamp()
         })
 
 @app.route('/config/summary', methods=['GET'])
 def config_summary():
     """Get configuration summary"""
-    if not CONFIG_AVAILABLE or not config:
+    if not CONFIG_AVAILABLE:
         return jsonify({
             "success": False,
             "error": "Configuration system not available",
-            "config_available": CONFIG_AVAILABLE
+            "config_available": False
         })
     
     try:
-        summary = config.get_summary()
-        return jsonify({
-            "success": True,
-            "configuration": summary,
-            "timestamp": get_current_timestamp() if UTILS_AVAILABLE else datetime.now().isoformat()
-        })
+        if config:
+            summary = config.get_summary()
+            return jsonify({
+                "success": True,
+                "configuration": summary,
+                "timestamp": get_current_timestamp()
+            })
+        else:
+            return jsonify({
+                "success": False,
+                "error": "Configuration not initialized"
+            })
     except Exception as e:
         return jsonify({
             "success": False,
             "error": str(e),
-            "timestamp": get_current_timestamp() if UTILS_AVAILABLE else datetime.now().isoformat()
+            "timestamp": get_current_timestamp()
         })
 
 @app.route('/technical/test', methods=['GET'])
@@ -863,7 +971,7 @@ def technical_test():
                     "signal_strength": signals.get('strength', 0),
                     "signal_confidence": signals.get('confidence', 0)
                 },
-                "timestamp": get_current_timestamp() if UTILS_AVAILABLE else datetime.now().isoformat()
+                "timestamp": get_current_timestamp()
             })
         else:
             return jsonify({
@@ -875,7 +983,7 @@ def technical_test():
         return jsonify({
             "success": False,
             "error": str(e),
-            "timestamp": get_current_timestamp() if UTILS_AVAILABLE else datetime.now().isoformat()
+            "timestamp": get_current_timestamp()
         })
 
 @app.route('/test', methods=['GET'])
@@ -889,7 +997,7 @@ def test_apis():
         "technical_analysis": False,
         "machine_learning": False,
         "configuration": False,
-        "utilities": False
+        "utilities": UTILS_AVAILABLE
     }
     
     # Test Binance API
@@ -941,9 +1049,6 @@ def test_apis():
         except:
             pass
     
-    # Test Utilities
-    test_results["utilities"] = UTILS_AVAILABLE
-    
     return jsonify({
         "success": True,
         "api_status": test_results,
@@ -956,7 +1061,7 @@ def test_apis():
             "configuration": CONFIG_AVAILABLE,
             "utilities": UTILS_AVAILABLE
         },
-        "timestamp": get_current_timestamp() if UTILS_AVAILABLE else datetime.now().isoformat()
+        "timestamp": get_current_timestamp()
     })
 
 # ===============================
@@ -970,11 +1075,11 @@ def startup_notification():
         return
     
     try:
-        message = f"""🤖 <b>Crypto Analysis Bot V3.2 Enterprise</b>
+        message = f"""🤖 <b>Crypto Analysis Bot V3.2 Enterprise (Fixed)</b>
 🚀 <b>Bot Started Successfully!</b>
-⏰ {get_current_time_tehran() if UTILS_AVAILABLE else datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+⏰ {get_current_time_tehran()}
 
-✅ <b>Enterprise Features Active:</b>
+✅ <b>Enterprise Features Status:</b>
 📊 Technical Analysis: {'✅' if TA_AVAILABLE else '❌'}
 🧠 Machine Learning: {'✅' if ML_AVAILABLE else '❌'}
 🗄️ Database Storage: {'✅' if DATABASE_AVAILABLE else '❌'}
@@ -1012,11 +1117,11 @@ if __name__ == "__main__":
     print("=" * 60)
     print(f"🚀 Starting {BOT_NAME}...")
     print(f"📱 Version: {BOT_VERSION}")
-    print("📱 Features: Enterprise Edition with Full Integration")
+    print("📱 Features: Enterprise Edition with Safe Integration")
     print("=" * 60)
     
-    # Initialize all components
-    initialize_components()
+    # Initialize all components safely
+    safe_initialize_components()
     
     # Print component status
     print(f"📊 Technical Analysis: {'✅' if TA_AVAILABLE else '❌'}")
@@ -1029,7 +1134,7 @@ if __name__ == "__main__":
     # Print available endpoints
     print("\n🌐 Available endpoints:")
     endpoints = [
-        "GET  / - Home page with enterprise info",
+        "GET  / - Enterprise home with features info",
         "GET  /health - Comprehensive health check", 
         "GET  /status - Enterprise system status",
         "GET  /prices - Current crypto prices",
@@ -1039,12 +1144,18 @@ if __name__ == "__main__":
         "GET  /telegram/prices - Send prices to Telegram",
         "GET  /telegram/signals - Send signals to Telegram", 
         "GET  /telegram/daily-summary - Send daily summary",
-        "GET  /database/info - Database statistics",
-        "GET  /ml/status - Machine learning status",
-        "GET  /config/summary - Configuration summary",
-        "GET  /technical/test - Technical analysis test",
         "GET  /test - Comprehensive system test"
     ]
+    
+    # Add enterprise endpoints if available
+    if DATABASE_AVAILABLE:
+        endpoints.append("GET  /database/info - Database statistics")
+    if ML_AVAILABLE:
+        endpoints.append("GET  /ml/status - Machine learning status")
+    if CONFIG_AVAILABLE:
+        endpoints.append("GET  /config/summary - Configuration summary")
+    if TA_AVAILABLE:
+        endpoints.append("GET  /technical/test - Technical analysis test")
     
     for endpoint in endpoints:
         print(f"   {endpoint}")
