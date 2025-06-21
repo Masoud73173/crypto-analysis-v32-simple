@@ -289,7 +289,7 @@ if __name__ == '__main__':
         logger.info("   GET  /analyze - Simple crypto analysis")
         logger.info("   GET  /test - Test APIs")
         
-        port = 5000
+        port = int(os.getenv('PORT', 8080))
         logger.info(f"🌐 Starting on http://localhost:{port}")
         
         app.run(
