@@ -1,0 +1,192 @@
+# Crypto Analysis Bot V3.2 - Git Ignore Rules
+# =============================================
+
+# ======================
+# SECURITY - NEVER COMMIT THESE!
+# ======================
+.env
+*.env
+.env.local
+.env.production
+config.json
+secrets.json
+api_keys.txt
+credentials.json
+service-account.json
+
+# ======================
+# PYTHON
+# ======================
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+
+# Virtual environments
+venv/
+ENV/
+env/
+.venv/
+.ENV/
+.env/
+
+# ======================
+# DATABASE & DATA
+# ======================
+*.db
+*.sqlite
+*.sqlite3
+*.db-journal
+database/
+data/
+logs/
+*.log
+*.log.*
+
+# Machine Learning models
+models/
+*.pkl
+*.joblib
+*.h5
+*.model
+
+# CSV and data files
+*.csv
+*.json.backup
+historical_data/
+backups/
+
+# ======================
+# DEVELOPMENT
+# ======================
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# pyenv
+.python-version
+
+# ======================
+# OPERATING SYSTEM
+# ======================
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Linux
+*~
+
+# ======================
+# CLOUD & DEPLOYMENT
+# ======================
+# Google Cloud
+gcloud/
+.gcloud/
+*.tar.gz
+
+# Docker
+*.log
+.dockerignore.backup
+
+# Kubernetes
+*.yaml.backup
+*.yml.backup
+
+# ======================
+# CRYPTO BOT SPECIFIC
+# ======================
+# Trading data
+trades/
+portfolio/
+performance/
+signals_history/
+market_data/
+
+# Configuration backups
+config_backup/
+settings_backup/
+
+# Temporary files
+temp/
+tmp/
+cache/
+*.tmp
+*.temp
+
+# Bot logs
+bot_logs/
+error_logs/
+trading_logs/
+
+# ======================
+# MISCELLANEOUS
+# ======================
+# Archives
+*.zip
+*.tar.gz
+*.rar
+
+# Node.js (if frontend added)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
