@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Crypto Analysis Bot V3.2 - Simple Version با Telegram Integration
-Local Testing Version + Cloud Run Ready
+Crypto Analysis Bot V3.2 - Simple Version با Telegram Integration + Daily Summaries
+Local Testing Version + Cloud Run Ready + 24/7 Automation
 """
 
 import os
@@ -20,7 +20,7 @@ app = Flask(__name__)
 CORS(app)
 
 # Configuration
-BOT_VERSION = "3.2.0-Simple-Telegram"
+BOT_VERSION = "3.2.0-Simple-Telegram-Automated"
 app_start_time = datetime.now()
 total_requests = 0
 
@@ -137,6 +137,81 @@ def format_price_update(crypto_data):
     message += "<i>Live data from Binance API</i> 📡"
     return message
 
+def format_daily_summary(crypto_data, signals):
+    """Format daily market summary for Telegram"""
+    
+    # Calculate market stats
+    total_volume = sum(crypto['volume'] for crypto in crypto_data)
+    gainers = [c for c in crypto_data if c['change_24h'] > 0]
+    losers = [c for c in crypto_data if c['change_24h'] < 0]
+    
+    # Sort by performance
+    best_performer = max(crypto_data, key=lambda x: x['change_24h'])
+    worst_performer = min(crypto_data, key=lambda x: x['change_24h'])
+    highest_volume = max(crypto_data, key=lambda x: x['volume'])
+    
+    message = f"""
+🤖 <b>Crypto Analysis Bot V3.2</b>
+
+📊 <b>Daily Market Summary</b>
+⏰ {datetime.now().strftime('%Y-%m-%d 10:00')}
+
+📈 <b>Market Overview:</b>
+🟢 Gainers: {len(gainers)}/5
+🔴 Losers: {len(losers)}/5
+📊 Total Volume: {total_volume:,.0f}
+
+🏆 <b>Top Performer:</b>
+💰 <b>{best_performer['symbol']}</b> - ${best_performer['price']:,.2f}
+📈 24h: {best_performer['change_24h']:+.2f}%
+
+📉 <b>Worst Performer:</b>
+💰 <b>{worst_performer['symbol']}</b> - ${worst_performer['price']:,.2f}
+📈 24h: {worst_performer['change_24h']:+.2f}%
+
+🔥 <b>Highest Volume:</b>
+💰 <b>{highest_volume['symbol']}</b>
+📊 Volume: {highest_volume['volume']:,.0f}
+
+🎯 <b>Signals Today:</b>
+"""
+    
+    if signals:
+        message += f"🚨 {len(signals)} strong signal(s) detected\n"
+        for signal in signals[:2]:  # Top 2 signals
+            action = "🟢 BUY" if signal['recommendation'] == 'BUY' else "🔴 SELL"
+            message += f"   {action} {signal['symbol']} (Strength: {signal['signal_strength']})\n"
+    else:
+        message += "💤 No strong signals - Market in consolidation\n"
+    
+    if len(gainers) >= 3:
+        market_sentiment = "🟢 Bullish"
+    elif len(losers) >= 3:
+        market_sentiment = "🔴 Bearish"
+    else:
+        market_sentiment = "🟡 Neutral"
+    
+    message += f"""
+📊 <b>Market Sentiment:</b> {market_sentiment}
+
+💡 <b>Today's Recommendation:</b>
+"""
+    
+    if len(gainers) >= 3:
+        message += "🚀 Consider taking profits on strong positions"
+    elif len(losers) >= 3:
+        message += "🛡️ HODL and wait for better entry points"
+    else:
+        message += "⏳ Monitor closely - Market deciding direction"
+    
+    message += f"""
+
+🤖 <i>Next analysis in 2 hours</i>
+📊 <i>Bot monitoring markets 24/7</i> 🚀
+"""
+    
+    return message
+
 # =============================================================================
 # 📊 CRYPTO DATA FUNCTIONS
 # =============================================================================
@@ -244,10 +319,15 @@ def analyze_simple_signals(crypto_data):
 def home():
     """Welcome page"""
     return jsonify({
-        'message': 'Welcome to Crypto Analysis Bot V3.2 Simple + Telegram',
+        'message': 'Welcome to Crypto Analysis Bot V3.2 Simple + Telegram + Automation',
         'version': BOT_VERSION,
         'status': 'running',
         'telegram_configured': bool(TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID),
+        'automation': {
+            'analysis_interval': '2 hours',
+            'daily_summary': '10:00 AM',
+            'monitoring': '24/7'
+        },
         'endpoints': {
             'health': '/health',
             'status': '/status',
@@ -256,6 +336,7 @@ def home():
             'telegram_test': '/telegram/test',
             'telegram_prices': '/telegram/prices',
             'telegram_signals': '/telegram/signals',
+            'telegram_daily_summary': '/telegram/daily-summary',
             'test': '/test'
         }
     })
@@ -271,7 +352,8 @@ def health_check():
         'timestamp': datetime.now().isoformat(),
         'version': BOT_VERSION,
         'uptime_seconds': (datetime.now() - app_start_time).total_seconds(),
-        'telegram_enabled': bool(TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID)
+        'telegram_enabled': bool(TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID),
+        'automation_ready': True
     })
 
 @app.route('/status', methods=['GET'])
@@ -294,12 +376,21 @@ def get_status():
             'simple_analysis': True,
             'ta_lib': False,
             'telegram': bool(TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID),
-            'real_time_data': True
+            'real_time_data': True,
+            'automation': True,
+            'daily_summaries': True
         },
         'telegram': {
             'enabled': bool(TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID),
             'bot_configured': bool(TELEGRAM_BOT_TOKEN),
             'chat_configured': bool(TELEGRAM_CHAT_ID)
+        },
+        'automation': {
+            'analysis_interval': '2 hours',
+            'daily_summary_time': '10:00 AM',
+            'monitoring': '24/7',
+            'next_analysis': 'Every 2 hours',
+            'next_summary': 'Daily at 10:00 AM'
         }
     })
 
@@ -403,6 +494,7 @@ def telegram_test():
 🎉 <b>Bot is Online & Working!</b>
 📱 Telegram integration successful
 🌐 Local/Cloud deployment active
+🤖 24/7 Automation ready
 
 <i>Ready to send crypto signals!</i> 🚀
 """
@@ -500,6 +592,51 @@ def telegram_signals():
             'error': str(e)
         }), 500
 
+@app.route('/telegram/daily-summary', methods=['GET', 'POST'])
+def telegram_daily_summary():
+    """Send daily market summary to Telegram"""
+    try:
+        if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
+            return jsonify({
+                'success': False,
+                'error': 'Telegram credentials not configured'
+            }), 400
+        
+        # Get crypto data and analyze
+        crypto_data = get_crypto_prices()
+        
+        if not crypto_data:
+            return jsonify({
+                'success': False,
+                'error': 'Failed to fetch crypto data'
+            }), 500
+        
+        signals = analyze_simple_signals(crypto_data)
+        
+        # Format and send daily summary
+        message = format_daily_summary(crypto_data, signals)
+        success = send_telegram_sync(message)
+        
+        return jsonify({
+            'success': success,
+            'message': 'Daily summary sent to Telegram' if success else 'Failed to send daily summary',
+            'signal_count': len(signals),
+            'symbols_analyzed': len(crypto_data),
+            'market_summary': {
+                'gainers': len([c for c in crypto_data if c['change_24h'] > 0]),
+                'losers': len([c for c in crypto_data if c['change_24h'] < 0]),
+                'total_volume': sum(crypto['volume'] for crypto in crypto_data)
+            },
+            'timestamp': datetime.now().isoformat()
+        })
+        
+    except Exception as e:
+        logger.error(f"Error sending daily summary: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
 @app.route('/test', methods=['GET'])
 def test_apis():
     """Test external APIs"""
@@ -545,8 +682,8 @@ def test_apis():
 
 if __name__ == '__main__':
     try:
-        logger.info("🚀 Starting Crypto Analysis Bot V3.2 Simple + Telegram...")
-        logger.info("📱 Features: Simple Analysis, Real-time Prices, Telegram Integration")
+        logger.info("🚀 Starting Crypto Analysis Bot V3.2 Simple + Telegram + Automation...")
+        logger.info("📱 Features: Simple Analysis, Real-time Prices, Telegram Integration, 24/7 Automation")
         
         # Check Telegram configuration
         if TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID:
@@ -562,6 +699,9 @@ if __name__ == '__main__':
 ✅ All systems operational
 📊 Monitoring 5 crypto pairs
 🔔 Ready to send signals
+🤖 24/7 Automation ready
+⏰ Analysis every 2 hours
+📊 Daily summary at 10:00 AM
 
 <i>Bot is now online and monitoring markets!</i> 🚀
 """
@@ -583,7 +723,14 @@ if __name__ == '__main__':
         logger.info("   GET  /telegram/test - Test Telegram")
         logger.info("   GET  /telegram/prices - Send prices to Telegram")
         logger.info("   GET  /telegram/signals - Send signals to Telegram")
+        logger.info("   GET  /telegram/daily-summary - Send daily summary to Telegram")
         logger.info("   GET  /test - Test APIs")
+        
+        logger.info("🤖 Automation Features:")
+        logger.info("   ⏰ Analysis every 2 hours")
+        logger.info("   📊 Daily summary at 10:00 AM")
+        logger.info("   🔔 Auto-send strong signals")
+        logger.info("   🌟 24/7 monitoring")
         
         port = int(os.getenv('PORT', 8080))
         logger.info(f"🌐 Starting on http://localhost:{port}")
